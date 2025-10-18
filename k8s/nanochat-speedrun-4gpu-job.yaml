@@ -1,0 +1,76 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nanochat-speedrun-4gpu
+  namespace: <gpu_namespace>
+  labels:
+    k8s-user: <>
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 60
+  template:
+    spec:
+      nodeSelector:
+        "nvidia.com/gpu.present": "true"
+      securityContext:
+        runAsUser: <>
+        runAsGroup: <>
+        fsGroup: <>
+      containers:
+        - name: main
+          image: danielwangd5/nanochat:cuda128
+          command: ["/bin/bash"]
+          args:
+            - -lc
+            - |
+              set -euo pipefail
+              export JOB_DIR="${HOME}/nanochat-run-4gpu"
+              rm -rf "${JOB_DIR}"
+              mkdir -p "${JOB_DIR}"
+              cp -a /workspace/. "${JOB_DIR}/"
+              rm -rf "${JOB_DIR}/.venv"
+              cd "${JOB_DIR}"
+              export NANOCHAT_BASE_DIR="${HOME}/.cache/nanochat-4gpu"
+              export WANDB_RUN="${WANDB_RUN:-k8s-speedrun-4gpu}"
+              export WANDB_MODE="${WANDB_MODE:-offline}"
+              bash speedrun.sh
+          workingDir: "<>"
+          env:
+            - name: HOME
+              value: "<>"
+            - name: WANDB_RUN
+              value: "k8s-speedrun-4gpu"
+            - name: WANDB_MODE
+              value: "offline"
+            - name: NANOCHAT_BASE_DIR
+              value: "<home>/.cache/nanochat-4gpu"
+            - name: TORCHINDUCTOR_CACHE_DIR
+              value: "<home>/.cache/nanochat-4gpu/torchinductor"
+            - name: NANOCHAT_NUM_GPUS
+              value: "4"
+            - name: BASE_DEVICE_BATCH_SIZE
+              value: "32"
+            - name: MID_DEVICE_BATCH_SIZE
+              value: "32"
+            - name: SFT_DEVICE_BATCH_SIZE
+              value: "4"
+            - name: SFT_TARGET_EXAMPLES_PER_STEP
+              value: "32"
+          volumeMounts:
+            - name: shm
+              mountPath: "/dev/shm"
+            - name: home
+              mountPath: "<>"
+          resources:
+            limits:
+              nvidia.com/gpu: "4"
+          imagePullPolicy: IfNotPresent
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: "21474836480"
+        - name: home
+          persistentVolumeClaim:
+            claimName: <>
+      restartPolicy: Never
